@@ -125,38 +125,59 @@ namespace WindowsFormsApp1
         // Изменение даты начала фильтрации
         private void dateTimePicker1_ValueChanged(object sender, EventArgs e)
         {
-            if (dateFrom.Value > dateTo.Value)
+            try
             {
-                dateTo.Value = dateFrom.Value;
+                if (dateFrom.Value > dateTo.Value)
+                {
+                    dateTo.Value = dateFrom.Value;
+                }
+                ApplyFilterAndSort();
             }
-            ApplyFilterAndSort();
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при изменении даты начала фильтрации:\n" + ex.Message);
+            }
         }
 
         // Изменение даты конца фильтрации
         private void dateTimePicker2_ValueChanged(object sender, EventArgs e)
         {
-            if (dateTo.Value < dateFrom.Value)
+            try
             {
-                dateFrom.Value = dateTo.Value;
+                if (dateTo.Value < dateFrom.Value)
+                {
+                    dateFrom.Value = dateTo.Value;
+                }
+                ApplyFilterAndSort();
             }
-            ApplyFilterAndSort();
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при изменении даты конца фильтрации:\n" + ex.Message);
+            }
         }
 
         // Применение фильтра по дате
         private void ApplyFilterAndSort()
         {
-            if (orderTable == null || orderTable.Rows.Count == 0)
-                return;
+            try
+            {
+                if (orderTable == null || orderTable.Rows.Count == 0)
+                    return;
 
-            DateTime start = dateFrom.Value.Date;
-            DateTime end = dateTo.Value.Date.AddDays(1).AddTicks(-1); // Конец дня
+                DateTime start = dateFrom.Value.Date;
+                DateTime end = dateTo.Value.Date.AddDays(1).AddTicks(-1); // Конец дня
 
-            // Фильтр DataView по дате
-            string filter = $"Дата >= #{start:MM/dd/yyyy}# AND Дата <= #{end:MM/dd/yyyy}#";
-            DataView dv = orderTable.DefaultView;
-            dv.RowFilter = filter;
+                // Фильтр DataView по дате
+                string filter = $"Дата >= #{start:MM/dd/yyyy}# AND Дата <= #{end:MM/dd/yyyy}#";
+                DataView dv = orderTable.DefaultView;
+                dv.RowFilter = filter;
 
-            dataGridView1.DataSource = dv;
+                dataGridView1.DataSource = dv;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при применении фильтра:\n" + ex.Message);
+            }
         }
 
         // Кнопка экспорта в Excel
@@ -307,19 +328,26 @@ namespace WindowsFormsApp1
         // Окрашивание строк DataGridView в зависимости от статуса
         private void dataGridView1_RowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
         {
-            if (dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value == null)
-                return;
+            try
+            {
+                if (dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value == null)
+                    return;
 
-            string status = dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value.ToString().ToLower();
+                string status = dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value.ToString().ToLower();
 
-            if (status.Contains("заверш"))
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightGreen;
-            else if (status.Contains("отмен"))
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightCoral;
-            else if (status.Contains("создан"))
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightYellow;
-            else
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.White;
+                if (status.Contains("заверш"))
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightGreen;
+                else if (status.Contains("отмен"))
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightCoral;
+                else if (status.Contains("создан"))
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightYellow;
+                else
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.White;
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show("Ошибка при окрашивании строк:\n" + ex.Message);
+            }
         }
     }
 }

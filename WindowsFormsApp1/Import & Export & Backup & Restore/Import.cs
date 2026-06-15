@@ -4,7 +4,9 @@ using System.Collections.Generic;
 using System.Data;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 
 namespace WindowsFormsApp1
@@ -106,8 +108,7 @@ namespace WindowsFormsApp1
                 {
                     con.Open();
 
-                    // Проверяем: есть ли данные в таблице
-                    bool tableIsEmpty = true;
+                    bool tableIsEmpty;
 
                     using (MySqlCommand checkCmd = new MySqlCommand(
                         $"SELECT EXISTS(SELECT 1 FROM `{tableName}` LIMIT 1);", con))
@@ -115,19 +116,19 @@ namespace WindowsFormsApp1
                         tableIsEmpty = Convert.ToInt32(checkCmd.ExecuteScalar()) == 0;
                     }
 
-                    // Находим AUTO_INCREMENT колонку
                     string autoIncrementColumn = null;
 
                     string aiQuery = @"
-                SELECT COLUMN_NAME
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = @table
-                  AND EXTRA LIKE '%auto_increment%'";
+                            SELECT COLUMN_NAME
+                            FROM INFORMATION_SCHEMA.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE()
+                              AND TABLE_NAME = @table
+                              AND EXTRA LIKE '%auto_increment%'";
 
                     using (MySqlCommand aiCmd = new MySqlCommand(aiQuery, con))
                     {
                         aiCmd.Parameters.AddWithValue("@table", tableName);
+
                         object result = aiCmd.ExecuteScalar();
 
                         if (result != null)
@@ -135,6 +136,12 @@ namespace WindowsFormsApp1
                     }
 
                     string[] headers = lines[0].Split(';');
+
+                    // Ищем колонку Password
+                    int passwordColumnIndex = Array.FindIndex(
+                        headers,
+                        h => h.Trim().Equals("Password",
+                            StringComparison.OrdinalIgnoreCase));
 
                     List<int> validIndexes = new List<int>();
                     List<string> dbColumns = new List<string>();
@@ -145,7 +152,8 @@ namespace WindowsFormsApp1
 
                         if (!tableIsEmpty &&
                             !string.IsNullOrEmpty(autoIncrementColumn) &&
-                            columnName.Equals(autoIncrementColumn, StringComparison.OrdinalIgnoreCase))
+                            columnName.Equals(autoIncrementColumn,
+                                StringComparison.OrdinalIgnoreCase))
                         {
                             continue;
                         }
@@ -159,6 +167,10 @@ namespace WindowsFormsApp1
                         MessageBox.Show("Не найдены колонки для импорта.");
                         return;
                     }
+                    int dateColumnIndex = Array.FindIndex(
+                                            headers,
+                                            h => h.Trim().Equals("Date",
+                                                StringComparison.OrdinalIgnoreCase));
 
                     string columns = string.Join(",", dbColumns);
 
@@ -186,13 +198,67 @@ namespace WindowsFormsApp1
                             for (int j = 0; j < validIndexes.Count; j++)
                             {
                                 string value = validIndexes[j] < values.Length
-                                    ? values[validIndexes[j]]
+                                    ? values[validIndexes[j]].Trim()
                                     : null;
 
-                                if (string.IsNullOrWhiteSpace(value))
-                                    cmd.Parameters.AddWithValue($"@p{j}", DBNull.Value);
+                                if (!string.IsNullOrWhiteSpace(value))
+                                {
+
+                                    if (validIndexes[j] == dateColumnIndex)
+                                    {
+                                        if (DateTime.TryParse(value, out DateTime dt))
+                                        {
+                                            cmd.Parameters.Add($"@p{j}", MySqlDbType.Date)
+                                                .Value = dt.Date;
+                                            continue;
+                                        }
+                                    }
+
+                                    if (headers[validIndexes[j]].Trim().Equals("Sum", StringComparison.OrdinalIgnoreCase) ||
+                                                    headers[validIndexes[j]].Trim().Equals("Discount", StringComparison.OrdinalIgnoreCase) ||
+                                                    headers[validIndexes[j]].Trim().Equals("TotalSum", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        decimal dec = decimal.Parse(
+                                            value.Replace(',', '.'),
+                                            System.Globalization.CultureInfo.InvariantCulture);
+
+                                        cmd.Parameters.Add($"@p{j}", MySqlDbType.Decimal).Value = dec;
+                                        continue;
+                                    }
+
+                                    // Хэшируем пароль если нужно
+                                    if (validIndexes[j] == passwordColumnIndex)
+                                    {
+                                        bool isHash =
+                                            value.Length == 64 &&
+                                            System.Text.RegularExpressions.Regex.IsMatch(
+                                                value,
+                                                @"^[a-fA-F0-9]{64}$");
+
+                                        if (!isHash)
+                                        {
+                                            using (var sha = System.Security.Cryptography.SHA256.Create())
+                                            {
+                                                byte[] hashBytes = sha.ComputeHash(
+                                                    Encoding.UTF8.GetBytes(value));
+
+                                                value = BitConverter.ToString(hashBytes)
+                                                    .Replace("-", "")
+                                                    .ToLower();
+                                            }
+                                        }
+                                        else
+                                        {
+                                            value = value.ToLower();
+                                        }
+                                    }
+
+                                    cmd.Parameters.AddWithValue($"@p{j}", value);
+                                }
                                 else
-                                    cmd.Parameters.AddWithValue($"@p{j}", value.Trim());
+                                {
+                                    cmd.Parameters.AddWithValue($"@p{j}", DBNull.Value);
+                                }
                             }
 
                             try
@@ -234,7 +300,8 @@ namespace WindowsFormsApp1
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Ошибка импорта:\n{ex.Message}",
+                MessageBox.Show(
+                    $"Ошибка импорта:\n{ex.Message}",
                     "Ошибка",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);

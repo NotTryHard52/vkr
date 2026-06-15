@@ -36,71 +36,92 @@ namespace WindowsFormsApp1
 
         private void Doctor_Load(object sender, EventArgs e)
         {
-            typeof(FlowLayoutPanel)
-                    .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                    ?.SetValue(flowLayoutPanel1, true, null);
+            try
+            {
+                typeof(FlowLayoutPanel)
+                        .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                        ?.SetValue(flowLayoutPanel1, true, null);
 
-            FillSpecialties();                 // Заполнение списка специальностей
-            comboBox2.SelectedIndex = 0;       // Значение сортировки по умолчанию
-            comboBox1.SelectedIndex = 0;       // Фильтр специальностей по умолчанию
-            comboBox1.SelectedIndexChanged += comboBox1_SelectedIndexChanged; // Обработчик смены фильтра
-            textBox5.TextChanged += textBox5_TextChanged;                    // Обработчик ввода поиска
-            LoadDoctor();                      // Загрузка списка врачей
+                FillSpecialties();                 // Заполнение списка специальностей
+                comboBox2.SelectedIndex = 0;       // Значение сортировки по умолчанию
+                comboBox1.SelectedIndex = 0;       // Фильтр специальностей по умолчанию
+                comboBox1.SelectedIndexChanged += comboBox1_SelectedIndexChanged; // Обработчик смены фильтра
+                textBox5.TextChanged += textBox5_TextChanged;                    // Обработчик ввода поиска
+                LoadDoctor();                      // Загрузка списка врачей
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadDoctor()
         {
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB(); // Получаем строку подключения
-
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();                         // Открытие соединения
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB(); // Получаем строку подключения
 
-                doctorsTable = new DataTable();     // Таблица для загрузки данных
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();                         // Открытие соединения
 
-                // SQL-запрос — выбираем врачей + название специальности
-                MySqlCommand cmd = new MySqlCommand(
-                    "SELECT d.idDoctors, d.Surname, d.Name, d.Lastname, d.Phone_number, d.Photo, s.SpecialityName " +
-                    "FROM Doctors d JOIN Speciality s ON d.Speciality = s.idSpeciality;", con);
+                    doctorsTable = new DataTable();     // Таблица для загрузки данных
 
-                MySqlDataAdapter da = new MySqlDataAdapter(cmd); // Адаптер данных
-                da.Fill(doctorsTable);                           // Заполняем DataTable
+                    // SQL-запрос — выбираем врачей + название специальности
+                    MySqlCommand cmd = new MySqlCommand(
+                        "SELECT d.idDoctors, d.Surname, d.Name, d.Lastname, d.Phone_number, d.Photo, s.SpecialityName " +
+                        "FROM Doctors d JOIN Speciality s ON d.Speciality = s.idSpeciality;", con);
+
+                    MySqlDataAdapter da = new MySqlDataAdapter(cmd); // Адаптер данных
+                    da.Fill(doctorsTable);                           // Заполняем DataTable
+                }
+
+                LoadDoctorPhotos(doctorsTable);       // Загружаем фото врачей в таблицу
+
+                DisplayCards(doctorsTable); // Привязка таблицы к DataGridView
+                groupBox2.Text = $"Количество записей: {doctorsTable.Rows.Count}";
             }
-
-            LoadDoctorPhotos(doctorsTable);       // Загружаем фото врачей в таблицу
-
-            DisplayCards(doctorsTable); // Привязка таблицы к DataGridView
-            groupBox2.Text = $"Количество записей: {doctorsTable.Rows.Count}";
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void DisplayCards(DataTable table)
         {
-            flowLayoutPanel1.SuspendLayout();
-            flowLayoutPanel1.Controls.Clear();
-
-            foreach (DataRow row in table.Rows)
+            try
             {
-                DoctorCard card = new DoctorCard();
+                flowLayoutPanel1.SuspendLayout();
+                flowLayoutPanel1.Controls.Clear();
 
-                int id = Convert.ToInt32(row["idDoctors"]);
+                foreach (DataRow row in table.Rows)
+                {
+                    DoctorCard card = new DoctorCard();
 
-                string fio = $"{row["Surname"]} {row["Name"]} {row["Lastname"]}";
-                string phone = row["Phone_number"].ToString();
-                string spec = row["SpecialityName"].ToString();
-                Image photo = row["PhotoImage"] as Image;
+                    int id = Convert.ToInt32(row["idDoctors"]);
 
-                card.SetData(id, fio, phone, spec, photo);
-                card.EditClicked += Card_EditClicked;
-                card.DeleteClicked += Card_DeleteClicked;
-                card.MouseClick += (s, e) => selectedId = id;
+                    string fio = $"{row["Surname"]} {row["Name"]} {row["Lastname"]}";
+                    string phone = row["Phone_number"].ToString();
+                    string spec = row["SpecialityName"].ToString();
+                    Image photo = row["PhotoImage"] as Image;
 
-                flowLayoutPanel1.Controls.Add(card);
+                    card.SetData(id, fio, phone, spec, photo);
+                    card.EditClicked += Card_EditClicked;
+                    card.DeleteClicked += Card_DeleteClicked;
+                    card.MouseClick += (s, e) => selectedId = id;
+
+                    flowLayoutPanel1.Controls.Add(card);
+                }
+
+                flowLayoutPanel1.ResumeLayout();
+                groupBox2.Text = $"Количество записей: {table.Rows.Count}";
+                UpdateCardLayout();
             }
-
-            flowLayoutPanel1.ResumeLayout();
-            groupBox2.Text = $"Количество записей: {table.Rows.Count}";
-            UpdateCardLayout();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при отображении карточек:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadDoctorPhotos(DataTable table)
@@ -144,27 +165,34 @@ namespace WindowsFormsApp1
 
         private void FillSpecialties()
         {
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB(); // Получаем строку подключения
-
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB(); // Получаем строку подключения
 
-                string query = "SELECT DISTINCT SpecialityName FROM speciality;"; // Список специальностей
-                MySqlCommand cmd = new MySqlCommand(query, con);
-
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using (MySqlConnection con = new MySqlConnection(connectionString))
                 {
-                    comboBox1.Items.Clear();        // Очищаем список
-                    comboBox1.Items.Add("Все специальности");     // Пункт для отображения всех врачей
+                    con.Open();
 
-                    while (reader.Read())
+                    string query = "SELECT DISTINCT SpecialityName FROM speciality;"; // Список специальностей
+                    MySqlCommand cmd = new MySqlCommand(query, con);
+
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
-                        string specialty = reader["SpecialityName"].ToString();
-                        comboBox1.Items.Add(specialty); // Добавляем специальность
+                        comboBox1.Items.Clear();        // Очищаем список
+                        comboBox1.Items.Add("Все специальности");     // Пункт для отображения всех врачей
+
+                        while (reader.Read())
+                        {
+                            string specialty = reader["SpecialityName"].ToString();
+                            comboBox1.Items.Add(specialty); // Добавляем специальность
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке специальностей:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -175,43 +203,49 @@ namespace WindowsFormsApp1
 
         private void ApplyFilterAndSort()
         {
-            if (doctorsTable == null) return;
-
-            string filterExpr = ""; // Строка фильтра
-
-            // Фильтр по специальности
-            string selectedSpecialty =
-                        comboBox1.SelectedIndex > 0
-                        ? comboBox1.SelectedItem.ToString()
-                        : null;
-            if (!string.IsNullOrEmpty(selectedSpecialty) && selectedSpecialty != "Все специальности")
+            try
             {
-                filterExpr = $"SpecialityName = '{selectedSpecialty.Replace("'", "''")}'";
-            }
+                if (doctorsTable == null) return;
 
-            // Фильтр по фамилии
-            string searchText = textBox5.Text.Trim().Replace("'", "''");
-            if (!string.IsNullOrEmpty(searchText))
+                string filterExpr = ""; // Строка фильтра
+
+                // Фильтр по специальности
+                string selectedSpecialty =
+                            comboBox1.SelectedIndex > 0
+                            ? comboBox1.SelectedItem.ToString()
+                            : null;
+                if (!string.IsNullOrEmpty(selectedSpecialty) && selectedSpecialty != "Все специальности")
+                {
+                    filterExpr = $"SpecialityName = '{selectedSpecialty.Replace("'", "''")}'";
+                }
+
+                // Фильтр по фамилии
+                string searchText = textBox5.Text.Trim().Replace("'", "''");
+                if (!string.IsNullOrEmpty(searchText))
+                {
+                    if (!string.IsNullOrEmpty(filterExpr))
+                        filterExpr += " AND ";
+
+                    filterExpr += $"Surname LIKE '%{searchText}%'";
+                }
+
+                // Сортировка
+                string sortExpr = "";
+                if (comboBox2.SelectedIndex == 1)
+                    sortExpr = "Surname ASC";
+                else if (comboBox2.SelectedIndex == 2)
+                    sortExpr = "Surname DESC";
+
+                DataView dv = doctorsTable.DefaultView; // Представление таблицы
+                dv.RowFilter = filterExpr;              // Применяем фильтр
+                dv.Sort = string.IsNullOrWhiteSpace(sortExpr) ? null : sortExpr;                     // Применяем сортировку
+
+                DisplayCards(dv.ToTable());
+            }
+            catch (Exception ex)
             {
-                if (!string.IsNullOrEmpty(filterExpr))
-                    filterExpr += " AND ";
-
-                filterExpr += $"Surname LIKE '%{searchText}%'";
+                MessageBox.Show($"Ошибка при фильтрации/сортировке:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-
-            // Сортировка
-            string sortExpr = "";
-            if (comboBox2.SelectedIndex == 1)
-                sortExpr = "Surname ASC";
-            else if (comboBox2.SelectedIndex == 2)
-                sortExpr = "Surname DESC";
-
-            DataView dv = doctorsTable.DefaultView; // Представление таблицы
-            dv.RowFilter = filterExpr;              // Применяем фильтр
-            dv.Sort = string.IsNullOrWhiteSpace(sortExpr) ? null : sortExpr;                     // Применяем сортировку
-
-            DisplayCards(dv.ToTable());
-
         }
 
         private void comboBox1_SelectedIndexChanged(object sender, EventArgs e)
@@ -247,89 +281,104 @@ namespace WindowsFormsApp1
 
         private void Card_EditClicked(object sender, int id)
         {
-            Image photo = null;
-
-            DataRow[] rows = doctorsTable.Select($"idDoctors = {id}");
-            if (rows.Length > 0 && rows[0]["PhotoImage"] is Image img)
+            try
             {
-                photo = new Bitmap(img);
+                Image photo = null;
+
+                DataRow[] rows = doctorsTable.Select($"idDoctors = {id}");
+                if (rows.Length > 0 && rows[0]["PhotoImage"] is Image img)
+                {
+                    photo = new Bitmap(img);
+                }
+
+                EditDoctor editForm = new EditDoctor(id, photo);
+                editForm.ShowDialog();
+
+                LoadDoctor();
             }
-
-            EditDoctor editForm = new EditDoctor(id, photo);
-            editForm.ShowDialog();
-
-            LoadDoctor();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при редактировании врача:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void Card_DeleteClicked(object sender, int id)
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-
-                // Проверка использования в расписании
-                string checkQuery = "SELECT COUNT(*) FROM Schedule WHERE idDoctor = @doctorId";
-                using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, con))
+                using (MySqlConnection con = new MySqlConnection(connectionString))
                 {
-                    checkCmd.Parameters.AddWithValue("@doctorId", id);
-                    int count = Convert.ToInt32(checkCmd.ExecuteScalar());
+                    con.Open();
 
-                    if (count > 0)
+                    // Проверка использования в расписании
+                    string checkQuery = "SELECT COUNT(*) FROM Schedule WHERE idDoctor = @doctorId";
+                    using (MySqlCommand checkCmd = new MySqlCommand(checkQuery, con))
                     {
-                        MessageBox.Show("Нельзя удалить врача, он используется в расписании!", "Ошибка!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        checkCmd.Parameters.AddWithValue("@doctorId", id);
+                        int count = Convert.ToInt32(checkCmd.ExecuteScalar());
+
+                        if (count > 0)
+                        {
+                            MessageBox.Show("Нельзя удалить врача, он используется в расписании!", "Ошибка!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            return;
+                        }
+                    }
+
+                    if (MessageBox.Show("Удалить врача?", "Подтверждение",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question) != DialogResult.Yes)
                         return;
-                    }
-                }
 
-                if (MessageBox.Show("Удалить врача?", "Подтверждение",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
-                    return;
+                    // Получаем имя фото
+                    string photoFileName = "";
 
-                // Получаем имя фото
-                string photoFileName = "";
-
-                string photoQuery = "SELECT Photo FROM Doctors WHERE idDoctors = @id";
-                using (MySqlCommand photoCmd = new MySqlCommand(photoQuery, con))
-                {
-                    photoCmd.Parameters.AddWithValue("@id", id);
-
-                    object result = photoCmd.ExecuteScalar();
-
-                    if (result != null && result != DBNull.Value)
+                    string photoQuery = "SELECT Photo FROM Doctors WHERE idDoctors = @id";
+                    using (MySqlCommand photoCmd = new MySqlCommand(photoQuery, con))
                     {
-                        photoFileName = result.ToString();
-                    }
-                }
+                        photoCmd.Parameters.AddWithValue("@id", id);
 
-                // Удаляем врача из БД
-                string deleteQuery = "DELETE FROM Doctors WHERE idDoctors = @id";
-                using (MySqlCommand cmd = new MySqlCommand(deleteQuery, con))
-                {
-                    cmd.Parameters.AddWithValue("@id", id);
-                    cmd.ExecuteNonQuery();
-                }
+                        object result = photoCmd.ExecuteScalar();
 
-                // Удаляем фото из папки
-                if (!string.IsNullOrWhiteSpace(photoFileName))
-                {
-                    string photoPath = Path.Combine(Application.StartupPath,"photo",photoFileName);
-
-                    if (File.Exists(photoPath))
-                    {
-                        try
+                        if (result != null && result != DBNull.Value)
                         {
-                            File.Delete(photoPath);
+                            photoFileName = result.ToString();
                         }
-                        catch (Exception ex)
+                    }
+
+                    // Удаляем врача из БД
+                    string deleteQuery = "DELETE FROM Doctors WHERE idDoctors = @id";
+                    using (MySqlCommand cmd = new MySqlCommand(deleteQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // Удаляем фото из папки
+                    if (!string.IsNullOrWhiteSpace(photoFileName))
+                    {
+                        string photoPath = Path.Combine(Application.StartupPath, "photo", photoFileName);
+
+                        if (File.Exists(photoPath))
                         {
-                            MessageBox.Show($"Врач удалён, но не удалось удалить фото:\n{ex.Message}","Предупреждение",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                            try
+                            {
+                                File.Delete(photoPath);
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show($"Врач удалён, но не удалось удалить фото:\n{ex.Message}", "Предупреждение", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
                         }
                     }
                 }
+
+                LoadDoctor();
             }
-
-            LoadDoctor();
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при удалении врача:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
+
     }
 }

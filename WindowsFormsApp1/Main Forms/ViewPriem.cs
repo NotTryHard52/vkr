@@ -26,26 +26,33 @@ namespace WindowsFormsApp1
         // Событие загрузки формы
         private void ViewPriem_Load(object sender, EventArgs e)
         {
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB(); // Получаем строку подключения
-            LoadOrderData(); // Загружаем данные о приёме
-            LoadServices();  // Загружаем услуги в таблицу
-            LoadStatuses();  // Загружаем статусы в comboBox
-            CalculateTotal(); // Вычисляем итоговую сумму
-
-            if (isGlav) { DisableForGlav(); } // Блокировка для главного пользователя
-
-            // Блокировка элементов при определённых статусах
-            if (comboBox1.Text == "Завершен" || comboBox1.Text == "Отменен")
+            try
             {
-                DisableEditing();
-            }
-            if (comboBox1.Text == "Создан" || comboBox1.Text == "Отменен")
-            {
-                button5.Enabled = false; // Печать чека недоступна
-            }
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB(); // Получаем строку подключения
+                LoadOrderData(); // Загружаем данные о приёме
+                LoadServices();  // Загружаем услуги в таблицу
+                LoadStatuses();  // Загружаем статусы в comboBox
+                CalculateTotal(); // Вычисляем итоговую сумму
 
-            var hoverEffect = new HoverDataGridView(dataGridView1); // Эффект при наведении на DataGridView
+                if (isGlav) { DisableForGlav(); } // Блокировка для главного пользователя
+
+                // Блокировка элементов при определённых статусах
+                if (comboBox1.Text == "Завершен" || comboBox1.Text == "Отменен")
+                {
+                    DisableEditing();
+                }
+                if (comboBox1.Text == "Создан" || comboBox1.Text == "Отменен")
+                {
+                    button5.Enabled = false; // Печать чека недоступна
+                }
+
+                var hoverEffect = new HoverDataGridView(dataGridView1); // Эффект при наведении на DataGridView
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при загрузке данных: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // Блокировка элементов для главного пользователя
@@ -74,10 +81,12 @@ namespace WindowsFormsApp1
         // Загрузка данных о приёме из БД
         private void LoadOrderData()
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-                string query = @"
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
+                    string query = @"
                         SELECT 
                             o.idOrder,
                             o.sum,
@@ -95,122 +104,156 @@ namespace WindowsFormsApp1
                         JOIN StatusesPriem st ON o.Status = st.idStatusesPriem
                         WHERE o.idOrder = @orderId;";
 
-                using (MySqlCommand cmd = new MySqlCommand(query, con))
-                {
-                    cmd.Parameters.AddWithValue("@orderId", orderId);
-                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    using (MySqlCommand cmd = new MySqlCommand(query, con))
                     {
-                        if (reader.Read())
+                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        using (MySqlDataReader reader = cmd.ExecuteReader())
                         {
-                            // Заполнение меток формы данными из БД
-                            label_number.Text = "Номер талона: " + reader["idOrder"].ToString();
-                            label_patient.Text = "Пациент: " + reader["patient_name"].ToString();
-                            label_doctor.Text = "Врач: " + reader["doctor_name"].ToString();
-                            label_data.Text = "Дата: " + reader["date"].ToString();
-                            label_time.Text = "Время: " + reader["time"].ToString();
-                            comboBox1.Text = reader["status"].ToString();
-                            // Сумма, скидка и итог к оплате
-                            decimal sum = reader.GetDecimal("sum");
-                            decimal discount = reader.GetDecimal("Discount");
-                            decimal total = reader.GetDecimal("TotalSum");
+                            if (reader.Read())
+                            {
+                                // Заполнение меток формы данными из БД
+                                label_number.Text = "Номер талона: " + reader["idOrder"].ToString();
+                                label_patient.Text = "Пациент: " + reader["patient_name"].ToString();
+                                label_doctor.Text = "Врач: " + reader["doctor_name"].ToString();
+                                label_data.Text = "Дата: " + reader["date"].ToString();
+                                label_time.Text = "Время: " + reader["time"].ToString();
+                                comboBox1.Text = reader["status"].ToString();
+                                // Сумма, скидка и итог к оплате
+                                decimal sum = reader.GetDecimal("sum");
+                                decimal discount = reader.GetDecimal("Discount");
+                                decimal total = reader.GetDecimal("TotalSum");
 
-                            label_total.Text = $"Итого: {total:N2} руб.";
-                            label5.Text = $"Скидка: {discount:N2} руб.";
-                            label10.Text = $"К оплате: {total:N2} руб.";
+                                label_total.Text = $"Итого: {total:N2} руб.";
+                                label5.Text = $"Скидка: {discount:N2} руб.";
+                                label10.Text = $"К оплате: {total:N2} руб.";
+                            }
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при загрузке данных о приёме: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Загрузка услуг из БД в DataGridView
         private void LoadServices()
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-                string serviceQuery = @"
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
+                    string serviceQuery = @"
                     SELECT s.Name AS 'Услуга', s.Price AS 'Цена'
                     FROM OrderServices os
                     INNER JOIN Services s ON os.ServicesId = s.idServices
                     WHERE os.OrderId = @orderId;";
-                using (MySqlCommand cmd = new MySqlCommand(serviceQuery, con))
-                {
-                    cmd.Parameters.AddWithValue("@orderId", orderId);
-                    DataTable dt = new DataTable();
-                    new MySqlDataAdapter(cmd).Fill(dt);
-                    dataGridView1.DataSource = dt;
-                    dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect; // Выбор полной строки
-                    dataGridView1.Columns["Услуга"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                    dataGridView1.Columns["Цена"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    using (MySqlCommand cmd = new MySqlCommand(serviceQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        DataTable dt = new DataTable();
+                        new MySqlDataAdapter(cmd).Fill(dt);
+                        dataGridView1.DataSource = dt;
+                        dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect; // Выбор полной строки
+                        dataGridView1.Columns["Услуга"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                        dataGridView1.Columns["Цена"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при загрузке услуг: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Загрузка всех статусов приёма в comboBox
         private void LoadStatuses()
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-                string statusQuery = "SELECT name FROM StatusesPriem;";
-                using (MySqlCommand cmd = new MySqlCommand(statusQuery, con))
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                using (MySqlConnection con = new MySqlConnection(connectionString))
                 {
-                    comboBox1.Items.Clear();
-                    while (reader.Read())
-                        comboBox1.Items.Add(reader["name"].ToString());
+                    con.Open();
+                    string statusQuery = "SELECT name FROM StatusesPriem;";
+                    using (MySqlCommand cmd = new MySqlCommand(statusQuery, con))
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        comboBox1.Items.Clear();
+                        while (reader.Read())
+                            comboBox1.Items.Add(reader["name"].ToString());
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при загрузке статусов: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Вычисление общей суммы услуг
         private void CalculateTotal()
         {
-            totalSum = 0;
-            foreach (DataGridViewRow row in dataGridView1.Rows)
+            try
             {
-                if (row.Cells["Цена"]?.Value != null && decimal.TryParse(row.Cells["Цена"].Value.ToString(), out decimal value))
-                    totalSum += value;
+                totalSum = 0;
+                foreach (DataGridViewRow row in dataGridView1.Rows)
+                {
+                    if (row.Cells["Цена"]?.Value != null && decimal.TryParse(row.Cells["Цена"].Value.ToString(), out decimal value))
+                        totalSum += value;
+                }
+                label_total.Text = $"Итого: {totalSum:F2} руб.";
             }
-            label_total.Text = $"Итого: {totalSum:F2} руб.";
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при вычислении суммы: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
         
         // Завершение приёма
         private void button4_Click(object sender, EventArgs e)
         {
-            if (dataGridView1.Rows.Count == 0)
+            try
             {
-                MessageBox.Show("Нельзя закрыть приём без оказанных услуг!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            using (MySqlConnection con = new MySqlConnection(connectionString))
-            {
-                con.Open();
-                string statusQuery = "SELECT idStatusesPriem FROM StatusesPriem WHERE name='Завершен' LIMIT 1;";
-                int statusId = Convert.ToInt32(new MySqlCommand(statusQuery, con).ExecuteScalar());
-
-                string updateQuery = "UPDATE `Order` SET Status=@status WHERE idOrder=@orderId;";
-                using (MySqlCommand cmd = new MySqlCommand(updateQuery, con))
+                if (dataGridView1.Rows.Count == 0)
                 {
-                    cmd.Parameters.AddWithValue("@status", statusId);
-                    cmd.Parameters.AddWithValue("@orderId", orderId);
-                    cmd.ExecuteNonQuery();
+                    MessageBox.Show("Нельзя закрыть приём без оказанных услуг!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
+                    string statusQuery = "SELECT idStatusesPriem FROM StatusesPriem WHERE name='Завершен' LIMIT 1;";
+                    int statusId = Convert.ToInt32(new MySqlCommand(statusQuery, con).ExecuteScalar());
 
-                comboBox1.Text = "Завершен";
+                    string updateQuery = "UPDATE `Order` SET Status=@status WHERE idOrder=@orderId;";
+                    using (MySqlCommand cmd = new MySqlCommand(updateQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@status", statusId);
+                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        cmd.ExecuteNonQuery();
+                    }
 
-                // Блокировка элементов формы
-                dataGridView1.Enabled = false;
-                button1.Enabled = false;
-                button2.Enabled = false;
-                button4.Enabled = false;
-                button5.Enabled = true; // Разрешена печать чека
-                button6.Enabled = false;
+                    comboBox1.Text = "Завершен";
 
-                MessageBox.Show("Приём завершён!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // Блокировка элементов формы
+                    dataGridView1.Enabled = false;
+                    button1.Enabled = false;
+                    button2.Enabled = false;
+                    button4.Enabled = false;
+                    button5.Enabled = true; // Разрешена печать чека
+                    button6.Enabled = false;
+
+                    MessageBox.Show("Приём завершён!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при завершении приёма: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         // Кнопка "Добавить услугу"
         private void button1_Click(object sender, EventArgs e)
@@ -231,90 +274,104 @@ namespace WindowsFormsApp1
         // Метод добавления услуги к приёму
         private void AddServiceToOrder(int orderId)
         {
-            Services servicesForm = new Services(true);
-            if (servicesForm.ShowDialog() == DialogResult.OK)
+            try
             {
-                int serviceId = servicesForm.SelectedServiceId;
-                string serviceName = servicesForm.SelectedServiceName;
-                decimal servicePrice = servicesForm.SelectedServicePrice;
-
-                DataTable dt = (DataTable)dataGridView1.DataSource;
-
-                // Проверка на дублирование услуги
-                foreach (DataRow existingRow in dt.Rows)
+                Services servicesForm = new Services(true);
+                if (servicesForm.ShowDialog() == DialogResult.OK)
                 {
-                    if (existingRow["Услуга"].ToString() == serviceName)
+                    int serviceId = servicesForm.SelectedServiceId;
+                    string serviceName = servicesForm.SelectedServiceName;
+                    decimal servicePrice = servicesForm.SelectedServicePrice;
+
+                    DataTable dt = (DataTable)dataGridView1.DataSource;
+
+                    // Проверка на дублирование услуги
+                    foreach (DataRow existingRow in dt.Rows)
                     {
-                        MessageBox.Show("Эта услуга уже добавлена!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
+                        if (existingRow["Услуга"].ToString() == serviceName)
+                        {
+                            MessageBox.Show("Эта услуга уже добавлена!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
                     }
-                }
 
-                // Добавление услуги в таблицу
-                DataRow newRow = dt.NewRow();
-                newRow["Услуга"] = serviceName;
-                newRow["Цена"] = servicePrice;
-                dt.Rows.Add(newRow);
+                    // Добавление услуги в таблицу
+                    DataRow newRow = dt.NewRow();
+                    newRow["Услуга"] = serviceName;
+                    newRow["Цена"] = servicePrice;
+                    dt.Rows.Add(newRow);
 
-                // Добавление услуги в базу
-                using (MySqlConnection con = new MySqlConnection(connectionString))
-                {
-                    con.Open();
-                    string insertQuery = "INSERT INTO OrderServices (OrderId, ServicesId) VALUES (@orderId, @serviceId)";
-                    using (MySqlCommand cmd = new MySqlCommand(insertQuery, con))
+                    // Добавление услуги в базу
+                    using (MySqlConnection con = new MySqlConnection(connectionString))
                     {
-                        cmd.Parameters.AddWithValue("@orderId", orderId);
-                        cmd.Parameters.AddWithValue("@serviceId", serviceId);
-                        cmd.ExecuteNonQuery();
+                        con.Open();
+                        string insertQuery = "INSERT INTO OrderServices (OrderId, ServicesId) VALUES (@orderId, @serviceId)";
+                        using (MySqlCommand cmd = new MySqlCommand(insertQuery, con))
+                        {
+                            cmd.Parameters.AddWithValue("@orderId", orderId);
+                            cmd.Parameters.AddWithValue("@serviceId", serviceId);
+                            cmd.ExecuteNonQuery();
+                        }
                     }
-                }
 
-                CalculateTotal();
-                UpdateOrderTotalsInDatabase(); // Обновляем общие суммы в БД
+                    CalculateTotal();
+                    UpdateOrderTotalsInDatabase(); // Обновляем общие суммы в БД
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при добавлении услуги: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Метод удаления выбранной услуги
         private void RemoveSelectedService(int orderId)
         {
-            if (dataGridView1.SelectedRows.Count == 0)
+            try
             {
-                MessageBox.Show("Выберите услугу для удаления!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            DialogResult result = MessageBox.Show(
-                "Вы действительно хотите удалить выбранную услугу из талона?",
-                "Подтверждение",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
-
-            if (result == DialogResult.Yes)
-            {
-                string serviceName = dataGridView1.SelectedRows[0].Cells["Услуга"].Value.ToString();
-
-                using (MySqlConnection con = new MySqlConnection(connectionString))
+                if (dataGridView1.SelectedRows.Count == 0)
                 {
-                    con.Open();
-                    string deleteQuery = @"
+                    MessageBox.Show("Выберите услугу для удаления!", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                DialogResult result = MessageBox.Show(
+                    "Вы действительно хотите удалить выбранную услугу из талона?",
+                    "Подтверждение",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    string serviceName = dataGridView1.SelectedRows[0].Cells["Услуга"].Value.ToString();
+
+                    using (MySqlConnection con = new MySqlConnection(connectionString))
+                    {
+                        con.Open();
+                        string deleteQuery = @"
                         DELETE FROM OrderServices 
                         WHERE OrderId = @orderId 
                           AND ServicesId = (SELECT idServices FROM Services WHERE Name = @serviceName LIMIT 1)
                         LIMIT 1;";
 
-                    using (MySqlCommand cmd = new MySqlCommand(deleteQuery, con))
-                    {
-                        cmd.Parameters.AddWithValue("@orderId", orderId);
-                        cmd.Parameters.AddWithValue("@serviceName", serviceName);
-                        cmd.ExecuteNonQuery();
+                        using (MySqlCommand cmd = new MySqlCommand(deleteQuery, con))
+                        {
+                            cmd.Parameters.AddWithValue("@orderId", orderId);
+                            cmd.Parameters.AddWithValue("@serviceName", serviceName);
+                            cmd.ExecuteNonQuery();
+                        }
                     }
+
+                    LoadServices();
+                    CalculateTotal();
+                    UpdateOrderTotalsInDatabase();
+
+                    MessageBox.Show("Услуга удалена.", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-
-                LoadServices();
-                CalculateTotal();
-                UpdateOrderTotalsInDatabase();
-
-                MessageBox.Show("Услуга удалена.", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при удалении услуги: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -327,39 +384,46 @@ namespace WindowsFormsApp1
         // Обновление итоговой суммы, скидки и оплаты в БД
         private void UpdateOrderTotalsInDatabase()
         {
-            decimal sum = 0;
-
-            foreach (DataGridViewRow row in dataGridView1.Rows)
+            try
             {
-                if (row.Cells["Цена"]?.Value != null && decimal.TryParse(row.Cells["Цена"].Value.ToString(), out decimal value))
-                    sum += value;
-            }
+                decimal sum = 0;
 
-            decimal discount = 0;
-            if (sum >= 5000) discount = sum * 0.05m; // Скидка 5% при сумме >5000
-            decimal total = sum - discount;
+                foreach (DataGridViewRow row in dataGridView1.Rows)
+                {
+                    if (row.Cells["Цена"]?.Value != null && decimal.TryParse(row.Cells["Цена"].Value.ToString(), out decimal value))
+                        sum += value;
+                }
 
-            // Обновление меток
-            label_total.Text = $"Итого: {total:N2} руб.";
-            label5.Text = $"Скидка: {discount:N2} руб.";
-            label10.Text = $"К оплате: {total:N2} руб.";
+                decimal discount = 0;
+                if (sum >= 5000) discount = sum * 0.05m; // Скидка 5% при сумме >5000
+                decimal total = sum - discount;
 
-            // Обновление БД
-            using (MySqlConnection con = new MySqlConnection(connectionString))
-            {
-                con.Open();
-                string updateQuery = @"
+                // Обновление меток
+                label_total.Text = $"Итого: {total:N2} руб.";
+                label5.Text = $"Скидка: {discount:N2} руб.";
+                label10.Text = $"К оплате: {total:N2} руб.";
+
+                // Обновление БД
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
+                    string updateQuery = @"
                     UPDATE `Order` 
                     SET sum=@sum, Discount=@discount, TotalSum=@total 
                     WHERE idOrder=@orderId";
-                using (MySqlCommand cmd = new MySqlCommand(updateQuery, con))
-                {
-                    cmd.Parameters.AddWithValue("@sum", sum);
-                    cmd.Parameters.AddWithValue("@discount", discount);
-                    cmd.Parameters.AddWithValue("@total", total);
-                    cmd.Parameters.AddWithValue("@orderId", orderId);
-                    cmd.ExecuteNonQuery();
+                    using (MySqlCommand cmd = new MySqlCommand(updateQuery, con))
+                    {
+                        cmd.Parameters.AddWithValue("@sum", sum);
+                        cmd.Parameters.AddWithValue("@discount", discount);
+                        cmd.Parameters.AddWithValue("@total", total);
+                        cmd.Parameters.AddWithValue("@orderId", orderId);
+                        cmd.ExecuteNonQuery();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при обновлении итогов в БД: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -505,54 +569,61 @@ namespace WindowsFormsApp1
         // Отмена приёма
         private void button6_Click(object sender, EventArgs e)
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-
-                // Получаем id статуса "Отменен" для Order
-                int orderStatusId = Convert.ToInt32(new MySqlCommand(
-                    "SELECT idStatusesPriem FROM StatusesPriem WHERE Name='Отменен' LIMIT 1;", con).ExecuteScalar());
-
-                // Получаем ScheduleId для текущего Order
-                MySqlCommand scheduleCmd = new MySqlCommand(
-                    "SELECT Schedule FROM `Order` WHERE idOrder=@orderId LIMIT 1;", con);
-                scheduleCmd.Parameters.AddWithValue("@orderId", orderId);
-                int scheduleId = Convert.ToInt32(scheduleCmd.ExecuteScalar());
-
-                // Получаем id статуса "Свободно" для Schedule
-                int freeScheduleStatusId = Convert.ToInt32(new MySqlCommand(
-                    "SELECT idStatuses FROM Statuses WHERE StatusName='Свободно' LIMIT 1;", con).ExecuteScalar());
-
-                if (orderStatusId == 0 || scheduleId == 0 || freeScheduleStatusId == 0)
+                using (MySqlConnection con = new MySqlConnection(connectionString))
                 {
-                    MessageBox.Show("Ошибка: не найден нужный статус или расписание.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
+                    con.Open();
+
+                    // Получаем id статуса "Отменен" для Order
+                    int orderStatusId = Convert.ToInt32(new MySqlCommand(
+                        "SELECT idStatusesPriem FROM StatusesPriem WHERE Name='Отменен' LIMIT 1;", con).ExecuteScalar());
+
+                    // Получаем ScheduleId для текущего Order
+                    MySqlCommand scheduleCmd = new MySqlCommand(
+                        "SELECT Schedule FROM `Order` WHERE idOrder=@orderId LIMIT 1;", con);
+                    scheduleCmd.Parameters.AddWithValue("@orderId", orderId);
+                    int scheduleId = Convert.ToInt32(scheduleCmd.ExecuteScalar());
+
+                    // Получаем id статуса "Свободно" для Schedule
+                    int freeScheduleStatusId = Convert.ToInt32(new MySqlCommand(
+                        "SELECT idStatuses FROM Statuses WHERE StatusName='Свободно' LIMIT 1;", con).ExecuteScalar());
+
+                    if (orderStatusId == 0 || scheduleId == 0 || freeScheduleStatusId == 0)
+                    {
+                        MessageBox.Show("Ошибка: не найден нужный статус или расписание.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    // Обновление Schedule — перевод в статус "Свободно"
+                    MySqlCommand updateScheduleCmd = new MySqlCommand(
+                        "UPDATE Schedule SET Status=@scheduleStatusId WHERE idSchedule=@scheduleId;", con);
+                    updateScheduleCmd.Parameters.AddWithValue("@scheduleStatusId", freeScheduleStatusId);
+                    updateScheduleCmd.Parameters.AddWithValue("@scheduleId", scheduleId);
+                    updateScheduleCmd.ExecuteNonQuery();
+
+                    // Обновление Order — перевод в статус "Отменен"
+                    MySqlCommand updateOrderCmd = new MySqlCommand(
+                        "UPDATE `Order` SET Status=@orderStatusId WHERE idOrder=@orderId;", con);
+                    updateOrderCmd.Parameters.AddWithValue("@orderStatusId", orderStatusId);
+                    updateOrderCmd.Parameters.AddWithValue("@orderId", orderId);
+                    updateOrderCmd.ExecuteNonQuery();
+
+                    comboBox1.Text = "Отменен";
+
+                    // Блокировка элементов формы
+                    dataGridView1.Enabled = false;
+                    button1.Enabled = false;
+                    button2.Enabled = false;
+                    button4.Enabled = false;
+                    button6.Enabled = false;
+
+                    MessageBox.Show("Приём отменен!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-
-                // Обновление Schedule — перевод в статус "Свободно"
-                MySqlCommand updateScheduleCmd = new MySqlCommand(
-                    "UPDATE Schedule SET Status=@scheduleStatusId WHERE idSchedule=@scheduleId;", con);
-                updateScheduleCmd.Parameters.AddWithValue("@scheduleStatusId", freeScheduleStatusId);
-                updateScheduleCmd.Parameters.AddWithValue("@scheduleId", scheduleId);
-                updateScheduleCmd.ExecuteNonQuery();
-
-                // Обновление Order — перевод в статус "Отменен"
-                MySqlCommand updateOrderCmd = new MySqlCommand(
-                    "UPDATE `Order` SET Status=@orderStatusId WHERE idOrder=@orderId;", con);
-                updateOrderCmd.Parameters.AddWithValue("@orderStatusId", orderStatusId);
-                updateOrderCmd.Parameters.AddWithValue("@orderId", orderId);
-                updateOrderCmd.ExecuteNonQuery();
-
-                comboBox1.Text = "Отменен";
-
-                // Блокировка элементов формы
-                dataGridView1.Enabled = false;
-                button1.Enabled = false;
-                button2.Enabled = false;
-                button4.Enabled = false;
-                button6.Enabled = false;
-
-                MessageBox.Show("Приём отменен!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка при отмене приёма: " + ex.Message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

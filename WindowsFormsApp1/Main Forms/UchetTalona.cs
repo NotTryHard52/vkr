@@ -25,23 +25,30 @@ namespace WindowsFormsApp1
 
         public UchetTalona(bool isGlav = false)
         {
-            InitializeComponent();
-            this.isGlav = isGlav;
-            dataGridView1.SizeChanged += (s, e) => ReloadOrderTable();
-            if(isGlav)
+            try
             {
-                button6.Visible = true;
+                InitializeComponent();
+                this.isGlav = isGlav;
+                dataGridView1.SizeChanged += (s, e) => ReloadOrderTable();
+                if (isGlav)
+                {
+                    button6.Visible = true;
+                }
+
+                inactivityTimer = new Timer();
+                inactivityTimer.Interval = 1000; // проверка каждую секунду
+                inactivityTimer.Tick += InactivityTimer_Tick;
+                inactivityTimer.Start();
+
+                lastActivityTime = DateTime.Now;
+
+                // отслеживание активности
+                RegisterActivityHandlers(this);
             }
-
-            inactivityTimer = new Timer();
-            inactivityTimer.Interval = 1000; // проверка каждую секунду
-            inactivityTimer.Tick += InactivityTimer_Tick;
-            inactivityTimer.Start();
-
-            lastActivityTime = DateTime.Now;
-
-            // отслеживание активности
-            RegisterActivityHandlers(this);
+            catch(Exception ex)
+            {
+                MessageBox.Show($"Ошибка при инициализации формы:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void ResetActivity(object sender, EventArgs e)
@@ -60,141 +67,201 @@ namespace WindowsFormsApp1
 
         private void RegisterActivityHandlers(Control parent)
         {
-            foreach (Control ctrl in parent.Controls)
+            try
             {
-                ctrl.MouseMove += ResetActivity;
-                ctrl.MouseClick += ResetActivity;
-                ctrl.KeyDown += ResetActivity;
+                foreach (Control ctrl in parent.Controls)
+                {
+                    ctrl.MouseMove += ResetActivity;
+                    ctrl.MouseClick += ResetActivity;
+                    ctrl.KeyDown += ResetActivity;
 
-                // Рекурсивно для вложенных контролов
-                if (ctrl.HasChildren)
-                    RegisterActivityHandlers(ctrl);
+                    // Рекурсивно для вложенных контролов
+                    if (ctrl.HasChildren)
+                        RegisterActivityHandlers(ctrl);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при регистрации обработчиков активности:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private int CalculatePageSize()
         {
-            int rowHeight = dataGridView1.RowTemplate.Height;
-            int headerHeight = dataGridView1.ColumnHeadersHeight;
+            try
+            {
+                int rowHeight = dataGridView1.RowTemplate.Height;
+                int headerHeight = dataGridView1.ColumnHeadersHeight;
 
-            int availableHeight = dataGridView1.DisplayRectangle.Height;
+                int availableHeight = dataGridView1.DisplayRectangle.Height;
 
-            int rows = availableHeight / rowHeight;
+                int rows = availableHeight / rowHeight;
 
-            return Math.Max(1, rows - 1);
+                return Math.Max(1, rows - 1);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при расчёте размера страницы:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 10; // возвращаем значение по умолчанию
+            }
         }
 
         private int GetTotalCount(string filterSql)
         {
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
 
-                string query = "SELECT COUNT(*) FROM `Order` o " +
-                               "JOIN StatusesPriem st ON o.Status = st.idStatusesPriem " +
-                               filterSql;
+                    string query = "SELECT COUNT(*) FROM `Order` o " +
+                                   "JOIN StatusesPriem st ON o.Status = st.idStatusesPriem " +
+                                   filterSql;
 
-                MySqlCommand cmd = new MySqlCommand(query, con);
-                return Convert.ToInt32(cmd.ExecuteScalar());
+                    MySqlCommand cmd = new MySqlCommand(query, con);
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при получении общего количества записей:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return 0; // возвращаем 0 в случае ошибки
             }
         }
 
         private string BuildFilterSql()
         {
-            string where = "WHERE 1=1";
-
-            string status = comboBox1.SelectedItem?.ToString();
-            if (!string.IsNullOrEmpty(status) && status != "Все статусы")
+            try
             {
-                where += $" AND st.name = '{status.Replace("'", "''")}'";
-            }
+                string where = "WHERE 1=1";
 
-            string search = textBox5.Text.Trim();
-            if (!string.IsNullOrEmpty(search))
+                string status = comboBox1.SelectedItem?.ToString();
+                if (!string.IsNullOrEmpty(status) && status != "Все статусы")
+                {
+                    where += $" AND st.name = '{status.Replace("'", "''")}'";
+                }
+
+                string search = textBox5.Text.Trim();
+                if (!string.IsNullOrEmpty(search))
+                {
+                    where += $" AND o.idOrder LIKE '%{search}%'";
+                }
+
+                return where;
+            }
+            catch (Exception ex)
             {
-                where += $" AND o.idOrder LIKE '%{search}%'";
+                MessageBox.Show($"Ошибка при построении SQL фильтра:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return "WHERE 1=1"; // возвращаем базовый фильтр в случае ошибки
             }
-
-            return where;
         }
         private string GetSortSql()
         {
-            if (comboBox2.SelectedIndex == 1)
-                return "ORDER BY sc.date ASC";
-            else if (comboBox2.SelectedIndex == 2)
-                return "ORDER BY sc.date DESC";
+            try
+            {
+                if (comboBox2.SelectedIndex == 1)
+                    return "ORDER BY sc.date ASC";
+                else if (comboBox2.SelectedIndex == 2)
+                    return "ORDER BY sc.date DESC";
 
-            return " ";
+                return " ";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при построении SQL сортировки:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return " "; // возвращаем пустую строку в случае ошибки
+            }
         }
 
         // Событие загрузки формы
         private void UchetTalona_Load(object sender, EventArgs e)
         {
-            FillStatus();          // Заполнение comboBox статусами
-            comboBox1.SelectedIndex = 0; // По умолчанию "Все"
-            comboBox2.SelectedIndex = 0; // По умолчанию без сортировки
-            this.Shown += (s, ev) => ReloadOrderTable();
-            if (!isGlav)
+            try
             {
-                label2.Visible = false;
-                button6.Visible = false;
+                FillStatus();          // Заполнение comboBox статусами
+                comboBox1.SelectedIndex = 0; // По умолчанию "Все"
+                comboBox2.SelectedIndex = 0; // По умолчанию без сортировки
+                this.Shown += (s, ev) => ReloadOrderTable();
+                if (!isGlav)
+                {
+                    label2.Visible = false;
+                    button6.Visible = false;
+                }
+                dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
+                dataGridView1.RowTemplate.Height = 40;
             }
-            dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
-            dataGridView1.RowTemplate.Height = 40;
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке формы:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // Подсчёт общей выручки (не учитываются отменённые и созданные талоны)
         private void UpdateRevenueSum()
         {
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB();
-
-            string filterSql = BuildFilterSql();
-
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB();
 
-                string query = @"
+                string filterSql = BuildFilterSql();
+
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
+
+                    string query = @"
                         SELECT IFNULL(SUM(o.TotalSum), 0)
                         FROM `Order` o
                         JOIN StatusesPriem st ON o.Status = st.idStatusesPriem
                         WHERE st.name NOT IN ('Отменён', 'Создан');
                         ";
 
-                MySqlCommand cmd = new MySqlCommand(query, con);
+                    MySqlCommand cmd = new MySqlCommand(query, con);
 
-                object result = cmd.ExecuteScalar();
+                    object result = cmd.ExecuteScalar();
 
-                decimal total = 0;
+                    decimal total = 0;
 
-                if (result != null && result != DBNull.Value)
-                    total = Convert.ToDecimal(result);
+                    if (result != null && result != DBNull.Value)
+                        total = Convert.ToDecimal(result);
 
-                label2.Text = $"Общая выручка: {total:N2} руб.";
+                    label2.Text = $"Общая выручка: {total:N2} руб.";
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при подсчёте общей выручки:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Заполнение comboBox1 статусами из базы
         private void FillStatus()
         {
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB();
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
-                string query = "SELECT DISTINCT name FROM StatusesPriem;";
-                MySqlCommand cmd = new MySqlCommand(query, con);
-                using (MySqlDataReader reader = cmd.ExecuteReader())
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB();
+                using (MySqlConnection con = new MySqlConnection(connectionString))
                 {
-                    comboBox1.Items.Clear();
-                    comboBox1.Items.Add("Все статусы"); // Добавляем опцию "Все статусы"
-                    while (reader.Read())
+                    con.Open();
+                    string query = "SELECT DISTINCT name FROM StatusesPriem;";
+                    MySqlCommand cmd = new MySqlCommand(query, con);
+                    using (MySqlDataReader reader = cmd.ExecuteReader())
                     {
-                        string status = reader["name"].ToString();
-                        comboBox1.Items.Add(status); // Добавляем каждый статус
+                        comboBox1.Items.Clear();
+                        comboBox1.Items.Add("Все статусы"); // Добавляем опцию "Все статусы"
+                        while (reader.Read())
+                        {
+                            string status = reader["name"].ToString();
+                            comboBox1.Items.Add(status); // Добавляем каждый статус
+                        }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при заполнении статусов:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -227,62 +294,71 @@ namespace WindowsFormsApp1
         // Кнопка "Открыть талон"
         private void button1_Click(object sender, EventArgs e)
         {
-            if (dataGridView1.SelectedRows.Count > 0)
+            try
             {
-                int orderId = Convert.ToInt32(dataGridView1.SelectedRows[0].Cells["Номер"].Value);
-                if (!isGlav)
+                if (dataGridView1.SelectedRows.Count > 0)
                 {
-                    ViewPriem v = new ViewPriem(orderId, false);
-                    inactivityTimer.Stop();
+                    int orderId = Convert.ToInt32(dataGridView1.SelectedRows[0].Cells["Номер"].Value);
+                    if (!isGlav)
+                    {
+                        ViewPriem v = new ViewPriem(orderId, false);
+                        inactivityTimer.Stop();
 
-                    var result = v.ShowDialog();
+                        var result = v.ShowDialog();
 
-                    lastActivityTime = DateTime.Now;
-                    inactivityTimer.Start(); // открываем форму просмотра талона
+                        lastActivityTime = DateTime.Now;
+                        inactivityTimer.Start(); // открываем форму просмотра талона
+                    }
+                    else
+                    {
+                        ViewPriem v = new ViewPriem(orderId, true);
+                        inactivityTimer.Stop();
+
+                        var result = v.ShowDialog();
+
+                        lastActivityTime = DateTime.Now;
+                        inactivityTimer.Start(); // открываем форму просмотра талона
+                    }
+                    ReloadOrderTable(); // обновляем таблицу после просмотра
                 }
                 else
                 {
-                    ViewPriem v = new ViewPriem(orderId, true);
-                    inactivityTimer.Stop();
-
-                    var result = v.ShowDialog();
-
-                    lastActivityTime = DateTime.Now;
-                    inactivityTimer.Start(); // открываем форму просмотра талона
+                    MessageBox.Show("Пожалуйста, выберите талон.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
-                ReloadOrderTable(); // обновляем таблицу после просмотра
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Пожалуйста, выберите талон.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"Ошибка при открытии талона:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         // Загрузка данных о талонах из базы
         private void ReloadOrderTable()
         {
-            pageSize = CalculatePageSize();
-            Connect connect = new Connect();
-            connectionString = connect.ConnectDB();
-
-            string filterSql = BuildFilterSql();
-            string sortSql = GetSortSql();
-
-            using (MySqlConnection con = new MySqlConnection(connectionString))
+            try
             {
-                con.Open();
+                pageSize = CalculatePageSize();
+                Connect connect = new Connect();
+                connectionString = connect.ConnectDB();
 
-                // считаем записи
-                totalRecords = GetTotalCount(filterSql);
-                totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
+                string filterSql = BuildFilterSql();
+                string sortSql = GetSortSql();
 
-                // защита от выхода за границы
-                if (currentPage > totalPages)
-                    currentPage = totalPages == 0 ? 1 : totalPages;
+                using (MySqlConnection con = new MySqlConnection(connectionString))
+                {
+                    con.Open();
 
-                int offset = (currentPage - 1) * pageSize;
+                    // считаем записи
+                    totalRecords = GetTotalCount(filterSql);
+                    totalPages = (int)Math.Ceiling((double)totalRecords / pageSize);
 
-                string query = $@"
+                    // защита от выхода за границы
+                    if (currentPage > totalPages)
+                        currentPage = totalPages == 0 ? 1 : totalPages;
+
+                    int offset = (currentPage - 1) * pageSize;
+
+                    string query = $@"
                     SELECT 
                         o.idOrder AS 'Номер',
                         CONCAT(d.surname, ' ', d.name, ' ', d.lastname) AS 'Врач',
@@ -305,46 +381,51 @@ namespace WindowsFormsApp1
                     LIMIT @offset, @pageSize;
                 ";
 
-                MySqlCommand cmd = new MySqlCommand(query, con);
-                cmd.Parameters.AddWithValue("@offset", offset);
-                cmd.Parameters.AddWithValue("@pageSize", pageSize);
+                    MySqlCommand cmd = new MySqlCommand(query, con);
+                    cmd.Parameters.AddWithValue("@offset", offset);
+                    cmd.Parameters.AddWithValue("@pageSize", pageSize);
 
-                DataTable table = new DataTable();
-                MySqlDataAdapter da = new MySqlDataAdapter(cmd);
-                da.Fill(table);
+                    DataTable table = new DataTable();
+                    MySqlDataAdapter da = new MySqlDataAdapter(cmd);
+                    da.Fill(table);
 
-                orderTable = table;
+                    orderTable = table;
 
-                dataGridView1.DataSource = table;
-                dataGridView1.Columns["Сумма"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dataGridView1.Columns["Итого"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dataGridView1.Columns["Скидка"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-                dataGridView1.Columns["Время"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dataGridView1.Columns["Статус"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                dataGridView1.Columns["Врач"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dataGridView1.Columns["Пациент"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dataGridView1.Columns["Регистратор"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-                dataGridView1.Columns["Номер"].Width = 75;
-                dataGridView1.Columns["Сумма"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dataGridView1.Columns["Скидка"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dataGridView1.Columns["Итого"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dataGridView1.Columns["Дата"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dataGridView1.Columns["Время"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
-                dataGridView1.Columns["Статус"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.DataSource = table;
+                    dataGridView1.Columns["Сумма"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    dataGridView1.Columns["Итого"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    dataGridView1.Columns["Скидка"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                    dataGridView1.Columns["Время"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                    dataGridView1.Columns["Статус"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                    dataGridView1.Columns["Врач"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    dataGridView1.Columns["Пациент"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    dataGridView1.Columns["Регистратор"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+                    dataGridView1.Columns["Номер"].Width = 75;
+                    dataGridView1.Columns["Сумма"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["Скидка"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["Итого"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["Дата"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["Время"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["Статус"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
 
-                int start = (currentPage - 1) * pageSize + 1;
-                int end = Math.Min(currentPage * pageSize, totalRecords);
+                    int start = (currentPage - 1) * pageSize + 1;
+                    int end = Math.Min(currentPage * pageSize, totalRecords);
 
-                if (totalRecords == 0)
-                {
-                    start = 0;
-                    end = 0;
+                    if (totalRecords == 0)
+                    {
+                        start = 0;
+                        end = 0;
+                    }
+
+                    groupBox2.Text = $"Количество записей: {start}-{end} из {totalRecords}";
+                    label1.Text = $"Страница {currentPage} из {totalPages}";
+                    textBox1.Clear();
+                    UpdateRevenueSum();
                 }
-
-                groupBox2.Text = $"Количество записей: {start}-{end} из {totalRecords}";
-                label1.Text = $"Страница {currentPage} из {totalPages}";
-                textBox1.Clear();
-                UpdateRevenueSum();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при загрузке данных о талонах:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -359,26 +440,33 @@ namespace WindowsFormsApp1
         // Изменение цвета строк в зависимости от статуса
         private void dataGridView1_RowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
         {
-            if (dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value == null)
-                return;
+            try
+            {
+                if (dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value == null)
+                    return;
 
-            string status = dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value.ToString().ToLower();
+                string status = dataGridView1.Rows[e.RowIndex].Cells["Статус"].Value.ToString().ToLower();
 
-            if (status.Contains("заверш"))
-            {
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightGreen; // завершён
+                if (status.Contains("заверш"))
+                {
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightGreen; // завершён
+                }
+                else if (status.Contains("отмен"))
+                {
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightCoral; // отменён
+                }
+                else if (status.Contains("создан"))
+                {
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightYellow; // создан
+                }
+                else
+                {
+                    dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.White; // прочие
+                }
             }
-            else if (status.Contains("отмен"))
+            catch(Exception ex)
             {
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightCoral; // отменён
-            }
-            else if (status.Contains("создан"))
-            {
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.LightYellow; // создан
-            }
-            else
-            {
-                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.White; // прочие
+                MessageBox.Show($"Ошибка при раскраске строк:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -389,32 +477,53 @@ namespace WindowsFormsApp1
 
         private void button2_Click(object sender, EventArgs e)
         {
-            if (currentPage < totalPages)
+            try
             {
-                currentPage++;
-                ReloadOrderTable();
+                if (currentPage < totalPages)
+                {
+                    currentPage++;
+                    ReloadOrderTable();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при переходе на следующую страницу:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void button3_Click(object sender, EventArgs e)
         {
-            if (currentPage > 1)
+            try
             {
-                currentPage--;
-                ReloadOrderTable();
+                if (currentPage > 1)
+                {
+                    currentPage--;
+                    ReloadOrderTable();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при переходе на предыдущую страницу:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void button4_Click(object sender, EventArgs e)
         {
-            int page;
-            if (int.TryParse(textBox1.Text, out page))
+            try
             {
-                if (page >= 1 && page <= totalPages)
+                int page;
+                if (int.TryParse(textBox1.Text, out page))
                 {
-                    currentPage = page;
-                    ReloadOrderTable();
+                    if (page >= 1 && page <= totalPages)
+                    {
+                        currentPage = page;
+                        ReloadOrderTable();
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при переходе на указанную страницу:\n{ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

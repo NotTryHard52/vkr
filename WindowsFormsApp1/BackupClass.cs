@@ -45,6 +45,20 @@ namespace WindowsFormsApp1
 
             CreateDatabaseDump(fullPath);
 
+            // Добавляем CREATE DATABASE и USE в начало дампа
+            string dumpContent = File.ReadAllText(fullPath, Encoding.UTF8);
+
+            string header =
+                                @"CREATE DATABASE IF NOT EXISTS db71
+                        CHARACTER SET utf8mb4
+                        COLLATE utf8mb4_unicode_ci;
+
+                        USE db71;
+
+                        ";
+
+            File.WriteAllText(fullPath, header + dumpContent, Encoding.UTF8);
+
             return fullPath;
         }
 

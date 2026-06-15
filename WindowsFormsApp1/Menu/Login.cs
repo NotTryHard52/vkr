@@ -174,6 +174,16 @@ namespace WindowsFormsApp1
                     }
                     nextForm.FormClosed += (s, args) => this.Show();
                     nextForm.Show();
+                    captchaRequired = false;
+                    pictureBox3.Visible = false;
+                    button3.Visible = false;
+                    label3.Visible = false;
+                    textBox3.Visible = false;
+                    textBox3.Clear();
+                    pictureBox3.Visible = false;
+                    button1.Location = new Point(12, 278);
+                    this.MinimumSize = new Size(302, 447);
+                    this.Height = 447;
                 }
             }
             catch (MySqlException ex)
@@ -196,44 +206,51 @@ namespace WindowsFormsApp1
 
         private void Captcha_Load()
         {
-            if (pictureBox3.Width <= 0 || pictureBox3.Height <= 0)
-                return;
-
-            Captcha_current = GenerateCaptcha(5);
-            int width = Math.Max(pictureBox3.Width, 150);
-            int height = Math.Max(pictureBox3.Height, 50);
-
-            Bitmap bitmap = new Bitmap(width, height);
-            using (Graphics g = Graphics.FromImage(bitmap))
+            try
             {
-                g.Clear(Color.White);
+                if (pictureBox3.Width <= 0 || pictureBox3.Height <= 0)
+                    return;
 
-                for (int i = 0; i < bitmap.Width * bitmap.Height / 3; i++)
+                Captcha_current = GenerateCaptcha(5);
+                int width = Math.Max(pictureBox3.Width, 150);
+                int height = Math.Max(pictureBox3.Height, 50);
+
+                Bitmap bitmap = new Bitmap(width, height);
+                using (Graphics g = Graphics.FromImage(bitmap))
                 {
-                    int xNoise = random.Next(bitmap.Width);
-                    int yNoise = random.Next(bitmap.Height);
-                    bitmap.SetPixel(xNoise, yNoise, Color.FromArgb(random.Next(256), random.Next(256), random.Next(256)));
-                }
-                using (Font font = new Font("Arial", 24, FontStyle.Bold))
-                {
-                    int x = 10;
-                    foreach (char c in Captcha_current)
+                    g.Clear(Color.White);
+
+                    for (int i = 0; i < bitmap.Width * bitmap.Height / 3; i++)
                     {
-                        float offsetY = random.Next(-5, 6);
-                        g.DrawString(c.ToString(), font, Brushes.Black, new PointF(x, 10 + offsetY));
+                        int xNoise = random.Next(bitmap.Width);
+                        int yNoise = random.Next(bitmap.Height);
+                        bitmap.SetPixel(xNoise, yNoise, Color.FromArgb(random.Next(256), random.Next(256), random.Next(256)));
+                    }
+                    using (Font font = new Font("Arial", 24, FontStyle.Bold))
+                    {
+                        int x = 10;
+                        foreach (char c in Captcha_current)
+                        {
+                            float offsetY = random.Next(-5, 6);
+                            g.DrawString(c.ToString(), font, Brushes.Black, new PointF(x, 10 + offsetY));
 
-                        int charWidth = (int)g.MeasureString(c.ToString(), font).Width;
-                        int charHeight = (int)g.MeasureString(c.ToString(), font).Height;
+                            int charWidth = (int)g.MeasureString(c.ToString(), font).Width;
+                            int charHeight = (int)g.MeasureString(c.ToString(), font).Height;
 
-                        int lineY = (int)(10 + offsetY + random.Next(charHeight / 3, (charHeight * 2) / 3));
-                        Pen pen = new Pen(Color.FromArgb(random.Next(256), random.Next(256), random.Next(256)), 2);
-                        g.DrawLine(pen, x, lineY, x + charWidth, lineY);
+                            int lineY = (int)(10 + offsetY + random.Next(charHeight / 3, (charHeight * 2) / 3));
+                            Pen pen = new Pen(Color.FromArgb(random.Next(256), random.Next(256), random.Next(256)), 2);
+                            g.DrawLine(pen, x, lineY, x + charWidth, lineY);
 
-                        x += random.Next(20, 35);
+                            x += random.Next(20, 35);
+                        }
                     }
                 }
+                pictureBox3.Image = bitmap;
             }
-            pictureBox3.Image = bitmap;
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка генерации капчи: " + ex.Message);
+            }
         }
 
         // Кнопка "Выход"
